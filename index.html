@@ -1,0 +1,123 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS AI</title>
+<style>
+body {
+  background: #020b18;
+  color: #00d9ff;
+  font-family: Arial;
+  text-align: center;
+  padding: 20px;
+
+}
+</styel>
+</head>
+<body>
+
+<h1>J.A.R.V.I.S</h1>
+<p>PERSONAL AI ASSISTANT</p>
+
+<div class="circle">🤖</div>
+
+<p id="status">SYSTEM ONLINE</p>
+
+<select id="language">
+<option value="hi-IN">Hindi</option>
+<option value="en-US">English</option>
+</select>
+
+<br>
+
+<button onclick="startMic()">🎤 SPEAK</button>
+<button onclick="speak('Hello! I am Jarvis.')">🔊 TEST VOICE</button>
+
+<br>
+
+<input id="message" placeholder="Ask me anything...">
+<button onclick="send()">SEND</button>
+
+<div id="chat">JARVIS: Hello! How can I help you?</div>
+
+<script>
+function speak(text) {
+  let speech = new SpeechSynthesisUtterance(text);
+  speech.lang = document.getElementById("language").value;
+  speechSynthesis.speak(speech);
+}
+
+function reply(text) {
+  let answer = "";
+
+  if (text.includes("hello") || text.includes("नमस्ते")) {
+    answer = "Hello Sir! How can I help you?";
+  } else if (text.includes("नाम") || text.includes("name")) {
+    answer = "My name is JARVIS.";
+  } else if (text.includes("समय") || text.includes("time")) {
+    answer = "The time is " + new Date().toLocaleTimeString();
+  } else if (text.includes("तुम कौन") || text.includes("who are you")) {
+    answer = "I am your personal assistant JARVIS.";
+  } else {
+    answer = "I am listening. Please connect an AI brain for advanced answers.";
+  }
+
+  document.getElementById("chat").innerHTML +=
+    "<p>JARVIS: " + answer + "</p>";
+
+  speak(answer);
+}
+
+function send() {
+  let text = document.getElementById("message").value.trim();
+  if (!text) return;
+
+  document.getElementById("chat").innerHTML +=
+    "<p>YOU: " + text + "</p>";
+
+  document.getElementById("message").value = "";
+  reply(text.toLowerCase());
+}
+
+
+function startMic() {
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    alert("Please use Google Chrome.");
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+
+  recognition.lang = document.getElementById("language").value;
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  document.getElementById("status").innerText = "LISTENING...";
+
+  recognition.onresult = function(event) {
+    const text = event.results[0][0].transcript;
+    document.getElementById("message").value = text;
+    send();
+  };
+
+  recognition.onerror = function(event) {
+    document.getElementById("status").innerText =
+      "MIC ERROR: " + event.error;
+  };
+
+  recognition.onend = function() {
+    document.getElementById("status").innerText = "SYSTEM ONLINE";
+  };
+
+  recognition.start();
+}
+
+</script>
+
+</body>
+</html>
