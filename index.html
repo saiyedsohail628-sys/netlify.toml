@@ -1,123 +1,245 @@
-
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JARVIS AI</title>
-<style>
-body {
-  background: #020b18;
-  color: #00d9ff;
-  font-family: Arial;
-  text-align: center;
-  padding: 20px;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#020b18">
+  <title>JARVIS AI</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #020b18;
+      color: #b8f5ff;
+      --cyan: #00d9ff;
+      --muted: #78aab7;
+      --panel: rgba(5, 23, 42, .88);
+    }
 
-}
-</styel>
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 28px 16px;
+      background: radial-gradient(ellipse at 50% 5%, #0b3150 0, #020b18 55%);
+      color: var(--cyan);
+      text-align: center;
+    }
+
+    main { width: min(100%, 680px); margin: 0 auto; }
+    h1 { margin: 8px 0; letter-spacing: .2em; text-shadow: 0 0 18px #00d9ff88; }
+    .tagline { color: var(--muted); letter-spacing: .18em; font-size: .82rem; }
+    .circle {
+      width: 112px;
+      height: 112px;
+      display: grid;
+      place-items: center;
+      margin: 24px auto 16px;
+      border: 1px solid var(--cyan);
+      border-radius: 50%;
+      background: #00d9ff0d;
+      box-shadow: 0 0 24px #00d9ff55, inset 0 0 20px #00d9ff22;
+      font-size: 3rem;
+    }
+
+    #status { min-height: 1.4em; color: var(--cyan); font-size: .9rem; letter-spacing: .12em; }
+    .controls, .composer { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 16px 0; }
+    select, input, button {
+      min-height: 44px;
+      border: 1px solid #00d9ff88;
+      border-radius: 8px;
+      background: #06182a;
+      color: #d7faff;
+      font: inherit;
+    }
+    select, button { padding: 10px 14px; }
+    button { cursor: pointer; color: var(--cyan); transition: background .15s, box-shadow .15s; }
+    button:hover, button:focus-visible { background: #0b2a40; box-shadow: 0 0 12px #00d9ff55; }
+    button:disabled { cursor: wait; opacity: .6; }
+    input { flex: 1 1 220px; min-width: 0; padding: 10px 12px; }
+    #chat {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 170px;
+      max-height: 45vh;
+      overflow-y: auto;
+      margin-top: 22px;
+      padding: 14px;
+      border: 1px solid #00d9ff44;
+      border-radius: 12px;
+      background: var(--panel);
+      text-align: left;
+    }
+    .message { max-width: 90%; margin: 0; padding: 10px 12px; border-radius: 10px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+    .message.jarvis { align-self: flex-start; background: #00d9ff12; color: #b8f5ff; }
+    .message.user { align-self: flex-end; background: #07506a66; color: #fff; }
+    .hint { margin-top: 12px; color: var(--muted); font-size: .78rem; }
+    @media (max-width: 420px) {
+      body { padding: 20px 12px; }
+      .controls > button { flex: 1; }
+      #chat { max-height: 42vh; }
+    }
+  </style>
 </head>
 <body>
+  <main>
+    <h1>J.A.R.V.I.S</h1>
+    <p class="tagline">PERSONAL AI ASSISTANT</p>
+    <div class="circle" aria-hidden="true">🤖</div>
+    <p id="status" role="status" aria-live="polite">SYSTEM ONLINE</p>
 
-<h1>J.A.R.V.I.S</h1>
-<p>PERSONAL AI ASSISTANT</p>
+    <div class="controls">
+      <label class="visually-hidden" for="language">Voice and reply language</label>
+      <select id="language" aria-label="Voice and reply language">
+        <option value="hi-IN">Hindi</option>
+        <option value="en-US" selected>English</option>
+      </select>
+      <button id="micButton" type="button">🎤 SPEAK</button>
+      <button id="testVoiceButton" type="button">🔊 TEST VOICE</button>
+    </div>
 
-<div class="circle">🤖</div>
+    <form id="chatForm" class="composer">
+      <input id="message" maxlength="2000" autocomplete="off" placeholder="Ask me anything..." aria-label="Message for JARVIS">
+      <button id="sendButton" type="submit">SEND</button>
+    </form>
 
-<p id="status">SYSTEM ONLINE</p>
+    <section id="chat" aria-label="Conversation" aria-live="polite" aria-relevant="additions">
+      <p class="message jarvis">JARVIS: Hello! How can I help you?</p>
+    </section>
+    <p class="hint">Voice recognition requires HTTPS (or localhost) and microphone permission. Keep your Gemini API key in Netlify environment variables.</p>
+  </main>
 
-<select id="language">
-<option value="hi-IN">Hindi</option>
-<option value="en-US">English</option>
-</select>
+  <script>
+    const languageSelect = document.getElementById('language');
+    const messageInput = document.getElementById('message');
+    const chat = document.getElementById('chat');
+    const statusLine = document.getElementById('status');
+    const sendButton = document.getElementById('sendButton');
+    const micButton = document.getElementById('micButton');
+    const chatHistory = [];
+    let recognition = null;
+    let isSending = false;
 
-<br>
+    function addMessage(who, text) {
+      const message = document.createElement('p');
+      message.className = `message ${who}`;
+      message.textContent = `${who === 'user' ? 'YOU' : 'JARVIS'}: ${text}`;
+      chat.appendChild(message);
+      chat.scrollTop = chat.scrollHeight;
+    }
 
-<button onclick="startMic()">🎤 SPEAK</button>
-<button onclick="speak('Hello! I am Jarvis.')">🔊 TEST VOICE</button>
+    function speak(text) {
+      if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = languageSelect.value;
+      window.speechSynthesis.speak(utterance);
+    }
 
-<br>
+    async function sendMessage(rawText) {
+      const text = rawText.trim();
+      if (!text || isSending) return;
+      if (text.length > 2000) {
+        statusLine.textContent = 'MESSAGE TOO LONG (MAX 2000 CHARACTERS)';
+        return;
+      }
 
-<input id="message" placeholder="Ask me anything...">
-<button onclick="send()">SEND</button>
+      addMessage('user', text);
+      messageInput.value = '';
+      chatHistory.push({ role: 'user', text });
+      isSending = true;
+      sendButton.disabled = true;
+      statusLine.textContent = 'THINKING...';
 
-<div id="chat">JARVIS: Hello! How can I help you?</div>
+      try {
+        const response = await fetch('/.netlify/functions/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            language: languageSelect.value,
+            messages: chatHistory.slice(-12)
+          })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'The AI service is unavailable. Please try again.');
+        if (typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('JARVIS returned an empty response. Please try again.');
 
-<script>
-function speak(text) {
-  let speech = new SpeechSynthesisUtterance(text);
-  speech.lang = document.getElementById("language").value;
-  speechSynthesis.speak(speech);
-}
+        chatHistory.push({ role: 'model', text: data.reply });
+        if (chatHistory.length > 12) chatHistory.splice(0, chatHistory.length - 12);
+        addMessage('jarvis', data.reply);
+        speak(data.reply);
+        statusLine.textContent = 'SYSTEM ONLINE';
+      } catch (error) {
+        addMessage('jarvis', error.message || 'Sorry, I could not reach the AI service.');
+        statusLine.textContent = 'AI CONNECTION ERROR';
+      } finally {
+        isSending = false;
+        sendButton.disabled = false;
+        messageInput.focus();
+      }
+    }
 
-function reply(text) {
-  let answer = "";
+    document.getElementById('chatForm').addEventListener('submit', event => {
+      event.preventDefault();
+      sendMessage(messageInput.value);
+    });
 
-  if (text.includes("hello") || text.includes("नमस्ते")) {
-    answer = "Hello Sir! How can I help you?";
-  } else if (text.includes("नाम") || text.includes("name")) {
-    answer = "My name is JARVIS.";
-  } else if (text.includes("समय") || text.includes("time")) {
-    answer = "The time is " + new Date().toLocaleTimeString();
-  } else if (text.includes("तुम कौन") || text.includes("who are you")) {
-    answer = "I am your personal assistant JARVIS.";
-  } else {
-    answer = "I am listening. Please connect an AI brain for advanced answers.";
-  }
+    document.getElementById('testVoiceButton').addEventListener('click', () => {
+      speak(languageSelect.value === 'hi-IN' ? 'नमस्ते! मैं जार्विस हूँ।' : 'Hello! I am Jarvis.');
+    });
 
-  document.getElementById("chat").innerHTML +=
-    "<p>JARVIS: " + answer + "</p>";
+    micButton.addEventListener('click', () => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!window.isSecureContext) {
+        statusLine.textContent = 'MICROPHONE REQUIRES HTTPS OR LOCALHOST';
+        return;
+      }
+      if (!SpeechRecognition) {
+        statusLine.textContent = 'VOICE INPUT IS NOT SUPPORTED IN THIS BROWSER';
+        return;
+      }
+      if (recognition) {
+        try { recognition.abort(); } catch (_) { /* Recognition may already have stopped. */ }
+      }
 
-  speak(answer);
-}
+      const activeRecognition = new SpeechRecognition();
+      recognition = activeRecognition;
+      activeRecognition.lang = languageSelect.value;
+      activeRecognition.continuous = false;
+      activeRecognition.interimResults = false;
+      activeRecognition.maxAlternatives = 1;
+      statusLine.textContent = 'LISTENING... ALLOW MICROPHONE ACCESS';
+      micButton.disabled = true;
 
-function send() {
-  let text = document.getElementById("message").value.trim();
-  if (!text) return;
-
-  document.getElementById("chat").innerHTML +=
-    "<p>YOU: " + text + "</p>";
-
-  document.getElementById("message").value = "";
-  reply(text.toLowerCase());
-}
-
-
-function startMic() {
-  const SpeechRecognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if (!SpeechRecognition) {
-    alert("Please use Google Chrome.");
-    return;
-  }
-
-  const recognition = new SpeechRecognition();
-
-  recognition.lang = document.getElementById("language").value;
-  recognition.continuous = false;
-  recognition.interimResults = false;
-
-  document.getElementById("status").innerText = "LISTENING...";
-
-  recognition.onresult = function(event) {
-    const text = event.results[0][0].transcript;
-    document.getElementById("message").value = text;
-    send();
-  };
-
-  recognition.onerror = function(event) {
-    document.getElementById("status").innerText =
-      "MIC ERROR: " + event.error;
-  };
-
-  recognition.onend = function() {
-    document.getElementById("status").innerText = "SYSTEM ONLINE";
-  };
-
-  recognition.start();
-}
-
-</script>
-
+      activeRecognition.onresult = event => {
+        const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+        if (transcript) sendMessage(transcript);
+      };
+      activeRecognition.onerror = event => {
+        const errors = {
+          'not-allowed': 'MICROPHONE PERMISSION DENIED',
+          'service-not-allowed': 'MICROPHONE SERVICE NOT ALLOWED',
+          'audio-capture': 'NO MICROPHONE FOUND',
+          'no-speech': 'NO SPEECH DETECTED — TAP SPEAK TO TRY AGAIN',
+          'network': 'VOICE SERVICE NETWORK ERROR'
+        };
+        statusLine.textContent = errors[event.error] || `MIC ERROR: ${event.error}`;
+      };
+      activeRecognition.onend = () => {
+        if (recognition === activeRecognition) recognition = null;
+        micButton.disabled = false;
+        if (statusLine.textContent.startsWith('LISTENING')) statusLine.textContent = 'SYSTEM ONLINE';
+      };
+      try {
+        activeRecognition.start();
+      } catch (_) {
+        recognition = null;
+        micButton.disabled = false;
+        statusLine.textContent = 'COULD NOT START MICROPHONE — TRY AGAIN';
+      }
+    });
+  </script>
 </body>
 </html>
